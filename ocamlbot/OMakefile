@@ -12,7 +12,7 @@ OCAMLDEPFLAGS= -syntax camlp4o -package meta_conv.syntax,orakuda.syntax
 OCAMLPPFLAGS = -syntax camlp4o -package meta_conv.syntax,orakuda.syntax
 
 FILES[] = 
-    app
+    ocauth
     bot
 
 NO_INSTALL=true

@@ -1,3 +1,5 @@
+(** OCamllter application level auth library *)
+
 open Twitter
 open Auth
 

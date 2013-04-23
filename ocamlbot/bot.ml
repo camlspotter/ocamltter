@@ -11,15 +11,15 @@ let auth_file = match Exn.catch ~f:Sys.getenv "HOME" with
 
 let () =
   if not & File.Test._e auth_file then begin
-    App.Auth.save_dummy auth_file;
+    Ocauth.Auth.save_dummy auth_file;
     !!% "No auth table found. Created a dummy file: %s@." auth_file;
     exit 1
   end
 
 let () = prerr_endline "getting oauth..."
 let app, user = 
-  App.Auth.find (App.Auth.load auth_file) ~app:"ocamlbot" ~user:"ocamlbot"
-let o = App.Auth.oauth app user
+  Ocauth.Auth.find (Ocauth.Auth.load auth_file) ~app:"ocamlbot" ~user:"ocamlbot"
+let o = Ocauth.Auth.oauth app user
 let () = prerr_endline "oauth done"
 
 let is_ocaml_misspell = 
