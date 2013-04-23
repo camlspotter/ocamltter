@@ -41,7 +41,7 @@ let do_ocaml_misspell tw =
   let text = tw#text in
   if is_ocaml_misspell text then begin
     !!% "%Ld: %s@." tw#id text;
-    begin match Tweets.show tw#id o with
+    begin match Tweets.show o tw#id with
     | `Ok tw' ->
         !!% "%Ld: %s@." tw'#id tw'#text;
         assert (tw#id = tw'#id);
