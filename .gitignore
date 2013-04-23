@@ -1,4 +1,3 @@
-/ocamltter
 *.cmi
 *.cmo
 *.vo
@@ -19,3 +18,7 @@ ocamltter_top*
 OMakeroot
 setup.data
 setup.ml.ba*
+ocamlbot
+ocamlbot.opt
+ocamlbot.run
+
