@@ -37,22 +37,45 @@ let is_ocaml_misspell =
   in
   loop 
 
+let shindan tw =
+  String.contains ~needle:"shindanmaker.com" tw#text
+  ||
+  match tw#entities with
+  | None -> assert false
+  | Some ents -> 
+      List.exists (fun x -> 
+        String.contains ~needle:"shindanmaker.com" x)
+      & List.map (fun x -> x#expanded_url) ents#urls
+
 let do_ocaml_misspell tw =
   let text = tw#text in
-  if is_ocaml_misspell text then begin
-    !!% "%Ld: %s@." tw#id text;
-    begin match Tweets.show o tw#id with
-    | `Ok tw' ->
-        !!% "%Ld: %s@." tw'#id tw'#text;
-        assert (tw#id = tw'#id);
-        assert (tw#text = tw'#text)
-    | `Error e ->
-        !!% "ERROR: @[%a@]@." Api11.Error.format_error e
-    end;
-    match Favorites.create o tw#id with
-    | `Ok _ -> !!% "OK@."
-    | `Error e ->
-        !!% "ERROR: @[%a@]@." Api11.Error.format_error e
+  let user_name tw = (from_Some tw#user#details)#name in
+  let user_name = user_name tw in
+  if is_ocaml_misspell text 
+    && user_name <> "planet_ocaml"
+    && not (shindan tw)
+  then begin
+    !!% "%Ld: %s: %s@." tw#id user_name text;
+    if user_name <> "planet_ocaml" then begin 
+(* Had a bug of int64 id 
+      begin match Tweets.show tw#id o with
+      | `Ok tw' ->
+          assert (tw#id = tw'#id);
+          assert (tw#text = tw'#text)
+      | `Error e ->
+          !!% "ERROR: @[%a@]@." Api11.Error.format_error e
+      end;
+*)
+      let res, time = 
+        Unix.timed (fun () ->
+          match Favorites.create o tw#id with
+          | `Ok _ -> !!% "OK@."
+          | `Error e ->
+              !!% "ERROR: @[%a@]@." Api11.Error.format_error e) ()
+      in
+      !!% "TIME=%f@." time;
+      res
+    end
   end else 
     !!% "XXX: %s@." text
 
