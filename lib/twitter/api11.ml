@@ -78,7 +78,7 @@ let api post meth fmt = fun params oauth ->
 
 module Arg = struct
 
-  let (>>|) v f = Option.map ~f v
+  let (>>|) v f = Option.map f v
 
   (** { 7 to_string functions of option values *)
 
@@ -498,10 +498,10 @@ module Friendships = struct
   let lookup ?screen_name ?user_id oauth =
     api ts_of_json GET "friendships/lookup.json"
       [ "screen_name", 
-        Option.map ~f:(String.concat ",") screen_name
+        Option.map (String.concat ",") screen_name
 
       ; "user_id", 
-        Option.map ~f:(String.concat "," ** List.map Int64.to_string) user_id
+        Option.map (String.concat "," ** List.map Int64.to_string) user_id
       ]
       oauth
 

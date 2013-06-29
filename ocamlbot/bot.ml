@@ -38,13 +38,13 @@ let is_ocaml_misspell =
   loop 
 
 let shindan tw =
-  String.contains ~needle:"shindanmaker.com" tw#text
+  String.is_substring ~needle:"shindanmaker.com" tw#text
   ||
   match tw#entities with
   | None -> assert false
   | Some ents -> 
       List.exists (fun x -> 
-        String.contains ~needle:"shindanmaker.com" x)
+        String.is_substring ~needle:"shindanmaker.com" x)
       & List.map (fun x -> x#expanded_url) ents#urls
 
 let do_ocaml_misspell tw =
