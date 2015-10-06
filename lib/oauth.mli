@@ -12,46 +12,6 @@ type signature_method = [ `Hmac_sha1
                         | `Rsa_sha1 of Cryptokit.RSA.key 
                         ]
 
-val fetch_request_token : 
-  ?post:bool
-  -> ?handle_tweak:(Curl.handle -> unit)
-  -> host:string 
-  -> ?port:int
-  -> path:string 
-
-  -> ?oauth_version:string 
-  -> ?oauth_signature_method:signature_method (** default is `Hmac_sha1 *)
-  -> ?oauth_timestamp:float 
-  -> ?oauth_nonce:string 
-  -> ?oauth_other_params:(string * string) list
-  -> oauth_consumer_key:string 
-  -> oauth_consumer_secret:string 
-
-  -> unit
-  -> (string, [> Http.error]) Result.t 
-
-val fetch_access_token : 
-  verif:string 
-  -> oauth_token:string 
-  -> oauth_token_secret:string 
-
-  -> ?post:bool
-  -> ?handle_tweak:(Curl.handle -> unit)
-
-  -> host:string 
-  -> ?port:int
-  -> path:string 
-
-  -> ?oauth_version:string 
-  -> ?oauth_signature_method:signature_method  (** default is `Hmac_sha1 *)
-  -> ?oauth_timestamp:float 
-  -> ?oauth_nonce:string 
-  -> oauth_consumer_key:string 
-  -> oauth_consumer_secret:string 
-
-  -> unit
-  -> (string, [> Http.error]) Result.t 
-
 type t = {
   consumer_key        : string;
   consumer_secret     : string;
@@ -59,16 +19,60 @@ type t = {
   access_token_secret : string;
 } [@@deriving conv{ocaml}]
 
-val access :
-  ?proto: [ `HTTP | `HTTPS ]
-  -> host: string (** host *)
-  -> ?port: int (** port *)
-  -> path:string (** path *) 
-  -> meth:[< `GET of Http.params
-          | `POST of Http.params
-          | `POST_MULTIPART of Http.params2 ]
-     (** These parameters are outside of OAuth signature creation *)
-  -> oauth_other_params: Http.params
-  -> t 
-  -> (string, [> Http.error]) Result.t 
+module Make(Http : Http.S) : sig
+  type nonrec t = t
+      
+  type error = [`Http of Http.Error.t]
+      
+  val fetch_request_token : 
+    ?post:bool
+    -> host:string 
+    -> ?port:int
+    -> path:string 
+  
+    -> ?oauth_version:string 
+    -> ?oauth_signature_method:signature_method (** default is `Hmac_sha1 *)
+    -> ?oauth_timestamp:float 
+    -> ?oauth_nonce:string 
+    -> ?oauth_other_params:(string * string) list
+    -> oauth_consumer_key:string 
+    -> oauth_consumer_secret:string 
+  
+    -> unit
+    -> (string, [> error]) Result.t Http.m
+  
+  val fetch_access_token : 
+    verif:string 
+    -> oauth_token:string 
+    -> oauth_token_secret:string 
+  
+    -> ?post:bool
+  
+    -> host:string 
+    -> ?port:int
+    -> path:string 
+  
+    -> ?oauth_version:string 
+    -> ?oauth_signature_method:signature_method  (** default is `Hmac_sha1 *)
+    -> ?oauth_timestamp:float 
+    -> ?oauth_nonce:string 
+    -> oauth_consumer_key:string 
+    -> oauth_consumer_secret:string 
+  
+    -> unit
+    -> (string, [> error]) Result.t Http.m
+
+  val access :
+    ?proto: [ `HTTP | `HTTPS ]
+    -> host: string (** host *)
+    -> ?port: int (** port *)
+    -> path:string (** path *) 
+    -> meth:[< `GET of Http.params
+            | `POST of Http.params
+            | `POST_MULTIPART of Http.params2 ]
+       (** These parameters are outside of OAuth signature creation *)
+    -> oauth_other_params: Http.params
+    -> t 
+    -> (string, [> error]) Result.t Http.m
+end
 

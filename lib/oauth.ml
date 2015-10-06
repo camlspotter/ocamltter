@@ -214,80 +214,85 @@ let string_of_protocol = function
   | `HTTP -> "http"
   | `HTTPS -> "https"
 
-(* CR jfuruse: 
-   The distinction of oauth_other_params and non_oauth_params is not meaningful. *)
-let gen_access
-    ?handle_tweak
-    ?(proto=`HTTPS)
-    ~host ?port ~path
-    ~meth: method_non_oauth_params
-    ?(oauth_version = "1.0") 
-    ?(oauth_signature_method = `Hmac_sha1)
-    ?(oauth_timestamp = make_timestamp ()) 
-    ?(oauth_nonce = make_nonce ())
-    ?oauth_token 
-    ?oauth_token_secret
-    ?(oauth_other_params=[])
-    ~oauth_consumer_key 
-    ~oauth_consumer_secret 
-    ()
-    =
-  let url = string_of_protocol proto ^ "://" ^ host ^ path in
-  let header = 
-    create_oauth_header
-      ~http_method: (match method_non_oauth_params with `GET _ -> `GET | `POST _ | `POST_MULTIPART _ -> `POST)
-      ~url
-      ~oauth_version
-      ~oauth_signature_method
-      ~oauth_timestamp
-      ~oauth_nonce
-      ~oauth_consumer_key 
-      ~oauth_consumer_secret
-      ?oauth_token
-      ?oauth_token_secret
-      ~oauth_other_params 
-  in
-  let method_params = match method_non_oauth_params with
-    | `GET ps -> `GET (ps @ oauth_other_params)
-    | `POST ps -> `POST (ps @ oauth_other_params)
-    | `POST_MULTIPART psx -> `POST_MULTIPART (psx @ List.map (fun (k,v) -> k, `String v) oauth_other_params)
-  in
-  (* begin let k,v = header in !!% "HEADER %s : %s@." k v; end; *)
-  Http.by_curl 
-    ?handle_tweak
-    ~proto host ?port path 
-    ~headers:[header] 
-    method_params
-
-let fetch_request_token ?(post=true) = 
-  gen_access 
-    ~proto: `HTTPS 
-    ~meth: (if post then `POST [] else `GET [])
-    ?oauth_token:None 
-    ?oauth_token_secret:None 
- 
-let fetch_access_token ~verif ~oauth_token ~oauth_token_secret ?(post=true) =
-  gen_access 
-    ~proto: `HTTPS 
-    ~meth: (if post then `POST [] else `GET [])
-    ~oauth_token 
-    ~oauth_token_secret 
-    ~oauth_other_params:["oauth_verifier",verif]
-
 type t = {
   consumer_key:string; 
   consumer_secret:string;
   access_token:string; 
   access_token_secret:string;
 } [@@deriving conv{ocaml}]
+  
+module Make(Http : Http.S) = struct
 
-let access ?proto ~host ?port ~path ~meth:method_params ~oauth_other_params oauth =
-  gen_access ?proto ~host ~path ?port
-    ~oauth_consumer_key:oauth.consumer_key
-    ~oauth_consumer_secret:oauth.consumer_secret
-    ~oauth_token:oauth.access_token
-    ~oauth_token_secret:oauth.access_token_secret
-    ~oauth_other_params
-    ~meth: method_params
-    ()
+  type nonrec t = t
+      
+  type error = [`Http of Http.Error.t]
+      
+  (* CR jfuruse: 
+     The distinction of oauth_other_params and non_oauth_params is not meaningful. *)
+  let gen_access
+      ?(proto=`HTTPS)
+      ~host ?port ~path
+      ~meth: method_non_oauth_params
+      ?(oauth_version = "1.0") 
+      ?(oauth_signature_method = `Hmac_sha1)
+      ?(oauth_timestamp = make_timestamp ()) 
+      ?(oauth_nonce = make_nonce ())
+      ?oauth_token 
+      ?oauth_token_secret
+      ?(oauth_other_params=[])
+      ~oauth_consumer_key 
+      ~oauth_consumer_secret 
+      ()
+      =
+    let url = string_of_protocol proto ^ "://" ^ host ^ path in
+    let header = 
+      create_oauth_header
+        ~http_method: (match method_non_oauth_params with `GET _ -> `GET | `POST _ | `POST_MULTIPART _ -> `POST)
+        ~url
+        ~oauth_version
+        ~oauth_signature_method
+        ~oauth_timestamp
+        ~oauth_nonce
+        ~oauth_consumer_key 
+        ~oauth_consumer_secret
+        ?oauth_token
+        ?oauth_token_secret
+        ~oauth_other_params 
+    in
+    let method_params = match method_non_oauth_params with
+      | `GET ps -> `GET (ps @ oauth_other_params)
+      | `POST ps -> `POST (ps @ oauth_other_params)
+      | `POST_MULTIPART psx -> `POST_MULTIPART (psx @ List.map (fun (k,v) -> k, `String v) oauth_other_params)
+    in
+    (* begin let k,v = header in !!% "HEADER %s : %s@." k v; end; *)
+    Http.conn
+      ~proto host ?port path 
+      ~headers:[header] 
+      method_params
+  
+  let fetch_request_token ?(post=true) = 
+    gen_access 
+      ~proto: `HTTPS 
+      ~meth: (if post then `POST [] else `GET [])
+      ?oauth_token:None 
+      ?oauth_token_secret:None 
+   
+  let fetch_access_token ~verif ~oauth_token ~oauth_token_secret ?(post=true) =
+    gen_access 
+      ~proto: `HTTPS 
+      ~meth: (if post then `POST [] else `GET [])
+      ~oauth_token 
+      ~oauth_token_secret 
+      ~oauth_other_params:["oauth_verifier",verif]
+  
+  let access ?proto ~host ?port ~path ~meth:method_params ~oauth_other_params oauth =
+    gen_access ?proto ~host ~path ?port
+      ~oauth_consumer_key:oauth.consumer_key
+      ~oauth_consumer_secret:oauth.consumer_secret
+      ~oauth_token:oauth.access_token
+      ~oauth_token_secret:oauth.access_token_secret
+      ~oauth_other_params
+      ~meth: method_params
+      ()
+end
 

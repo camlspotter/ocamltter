@@ -46,3 +46,36 @@ val by_curl :
      | `POST_MULTIPART of params2 (** POST by multipart *)
      ]
   -> (string, [> error]) Result.t
+
+(** Abstraction of HTTP layer *)
+module type S = sig
+
+  type 'a m (** Some monad. Identity, Lwt.t or whatever *)
+    
+  type meth = [ `GET | `POST ]
+
+  type params = (string * string) list
+      
+  type params2 = (string * [ `String of string
+                           | `File   of string (** file contents *) ]) list
+      
+  module Error : sig
+    type t
+    val format : Format.t -> t -> unit
+  end
+
+  type error = [`Http of Error.t]
+      
+  val conn
+    : ?proto : [`HTTP | `HTTPS ] (** protocol. The default is HTTPS *)
+    -> string            (** hostname *)
+    -> ?port: int        (** port: the default is the default port of the protocol *)
+    -> string            (** path *)
+    -> headers: headers
+    -> [ `GET of params (** GET *)
+       | `POST of params (** POST *)
+       | `POST_MULTIPART of params2 (** POST by multipart *)
+       ]
+    -> (string, [> error]) Result.t m
+end
+  

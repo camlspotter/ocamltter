@@ -126,8 +126,9 @@ let conn ?(port=80) hostname meth ?headers  path ps ?(rawpost="") f =
     close ();
     raise @@ Http_error (!%"[%s] -> %s\n%s" !debug (Printexc.to_string e) msg)
 
+(*
 let () = Curl.global_init Curl.CURLINIT_GLOBALALL
-
+*)
 type error = 
   [ `Http of int * string  (** HTTP status other than 200 *)
   | `Curl of Curl.curlCode * int * string (** libcURL error *)
@@ -135,64 +136,37 @@ type error =
 
 let string_of_error = function
   | `Http (n, s) -> !%"Http error %d: %s" n s
-  | `Curl (cc, n, s) -> !%"Curl (%s) %d: %s" (Curl.strerror cc) n s
+  | `Curl (_cc, _n, _s) -> assert false
 
-let by_curl_gen ?handle_tweak ?(proto=`HTTPS) hostname ?port path ~headers meth_params =
-  let open Curl in
-  let h = new Curl.handle in
-  (* h#set_verbose true; *)
-  let proto_string = match proto with `HTTP -> "http" | `HTTPS -> "https" in
-  let url = !% "%s://%s%s%s" 
-    proto_string 
-    hostname 
-    (match port with None -> "" | Some p -> !% ":%d" p) 
-    path
-  in
-  let headers = ("Host", hostname) :: headers in
-  (* DEBUG List.iter (fun (k,v) -> Printf.eprintf "%s: %s\n%!" k v) headers; *)
-  begin match meth_params with
-  | `GET params ->
-      let url = if params <> [] then url ^ "?" ^ params2string params else url in
-      h#set_url url;
-      h#set_post false;
-      h#set_httpheader (List.map (fun (k,v) -> !% "%s: %s" k v) headers);
-  | `POST params ->
-      h#set_url url;
-      h#set_post true;
-      let s = params2string params in
-      h#set_postfields s;
-        (* set_postfields of OCurl 0.5.3 has a bug. 
-           We need explicit set_postfieldsize to workaround it.
-        *)
-      h#set_postfieldsize (String.length s);
-      h#set_httpheader (List.map (fun (k,v) -> !% "%s: %s" k v) headers);
-  | `POST_MULTIPART params ->
-      h#set_url url;
-      h#set_post true;
-      h#set_httppost 
-        (List.map (function
-          | (k, `File path) -> CURLFORM_FILE (k, path, DEFAULT)
-          | (k, `String s) -> CURLFORM_CONTENT (k, s, DEFAULT)) params);
-      h#set_httpheader (List.map (fun (k,v) -> !% "%s: %s" k v) headers);
-  end;
-  
-  let buf = Buffer.create 100 in
-  assert (h#get_cookielist = []);
-  h#set_writefunction (fun s -> Buffer.add_string buf s; String.length s);
-  (* Tweak h by the hanlder *)
-  (match handle_tweak with Some f -> f h | None -> ());
-  h#perform;
-  let code = h#get_httpcode in
-  h#cleanup; (* Need to flush out cookies *)
-  let ok200 = function
-    | 200, v -> `Ok v
-    | n, mes -> `Error (`Http (n, mes))
-  in	
-  ok200 (code, Buffer.contents buf)
+let by_curl ?handle_tweak:_ ?proto:_ _hostname ?port:_ _path ~headers:_ _meth_params =
+  assert false
 
-let by_curl ?handle_tweak ?proto hostname ?port path ~headers meth_params =
-  try 
-    by_curl_gen ?handle_tweak ?proto hostname ?port path ~headers meth_params
-  with
-  | Curl.CurlException (curlCode, int, mes) ->
-      `Error (`Curl (curlCode, int, mes))
+module type S = sig
+  type 'a m
+    
+  type meth = [ `GET | `POST ]
+
+  type params = (string * string) list
+      
+  type params2 = (string * [ `String of string
+                           | `File   of string (** file contents *) ]) list
+
+  module Error : sig
+    type t
+    val format : Format.t -> t -> unit
+  end
+      
+  type error = [`Http of Error.t]
+      
+  val conn
+    : ?proto : [`HTTP | `HTTPS ] (** protocol. The default is HTTPS *)
+    -> string            (** hostname *)
+    -> ?port: int        (** port: the default is the default port of the protocol *)
+    -> string            (** path *)
+    -> headers: headers
+    -> [ `GET of params (** GET *)
+       | `POST of params (** POST *)
+       | `POST_MULTIPART of params2 (** POST by multipart *)
+       ]
+    -> (string, [> error]) Result.t t
+end

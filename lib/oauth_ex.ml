@@ -6,12 +6,8 @@ open Util
 
 module Extra = struct
 
-  include Oauth
+  open Oauth
 
-  let error e =
-    prerr_endline & Http.string_of_error e;
-    assert false
-  
   module Consumer = struct
     type t = { key : string; secret : string } [@@deriving conv{ocaml}]
     let dummy = { key = "Base64EncodedDataHereX";
@@ -74,14 +70,14 @@ end
 
 include Extra
 
-module Make(Conf : Conf) = struct
+module Make(Http : Http.S)(Conf : Conf) = struct
 
   include Extra
-
+  include Oauth.Make(Http)
+    
   module Conf = Conf
 
   open Conf
-
 
   let fetch_request_token () =
     let oauth_callback_params = match oauth_callback with
@@ -122,16 +118,12 @@ module Make(Conf : Conf) = struct
     }
         
   let authorize_cli_interactive () =
-    match fetch_request_token () with
-    | `Error e -> error e
-    | `Ok req_token ->
-        Printf.printf "Please grant access at %s%s\n" authorize_url req_token.Request_token.token;
-        print_string "Give me the PIN: "; flush stdout;
-        let verif = read_line () in
-        match fetch_access_token ~req_token ~verif with
-        | `Error e -> error e
-        | `Ok (res, acc_token) -> res, acc_token
+    let open Result.Open in
+    fetch_request_token () >>= fun req_token ->
+    Printf.printf "Please grant access at %s%s\n" authorize_url req_token.Request_token.token;
+    print_string "Give me the PIN: "; flush stdout;
+    let verif = read_line () in
+    fetch_access_token ~req_token ~verif
 
-  let access = Oauth.access
 end
 

@@ -2,9 +2,6 @@ open Spotlib.Spot
     
 module Extra : sig
 
-  include module type of struct include Oauth end
-  (** It is an extension of Oauth *)
-     
   module Consumer : sig
     type t = { key : string; secret : string; } [@@deriving conv{ocaml}]
     val dummy : t
@@ -60,16 +57,20 @@ include module type of struct include Extra end
 (** [Make(Conf)] makes a OAuth interface of one service and 
     one application for the service specified by [Conf]. 
 *)
-module Make(Conf : Conf) : sig
+module Make(Http : Http.S)(Conf : Conf) : sig
 
+  type t = Oauth.t
+      
   include module type of struct include Extra end
   (** It is an extension of Extra, which is an extension of Oauth *)
 
+  type error = [`Http of Http.Error.t]
+      
   module Conf : Conf
 
   val fetch_request_token 
     : unit 
-    -> (Request_token.t, [> Http.error ]) Result.t
+    -> (Request_token.t, [> error]) Result.t Http.m
   (** Fetch a request token from the service. 
 
       See the implementation of [authorize_cli_interactive]
@@ -79,7 +80,7 @@ module Make(Conf : Conf) : sig
   val fetch_access_token 
     : req_token:Request_token.t 
     -> verif:string 
-    -> ((string * string) list * Access_token.t, [> Http.error ]) Result.t
+    -> ((string * string) list * Access_token.t, [> error]) Result.t Http.m
   (** Fetch an access token sending the request token 
       and the corresponding verification string from the service 
 
@@ -88,7 +89,7 @@ module Make(Conf : Conf) : sig
   *)
 
   val authorize_cli_interactive 
-    : unit -> (string * string) list * Access_token.t
+    : unit -> ((string * string) list * Access_token.t, [> error]) Result.t Http.m
   (** Starts CLI OAuth authorization.
 
       It asks the user to access an URL of the service to grant the app
@@ -110,9 +111,9 @@ module Make(Conf : Conf) : sig
        (** These parameters are outside of OAuth signature creation *)
     -> oauth_other_params: Http.params
        (** These parameters are included in the targets for OAuth signature creation *)
-    -> t (** Auth *)
+    -> Oauth.t (** Auth *)
 
-    -> (string, [> Http.error]) Result.t 
+    -> (string, [> error]) Result.t Http.m
   (** Access the service API. 
 
       Please note that [Http.params] and [Http.params2] of [meth]
